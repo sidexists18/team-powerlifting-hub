@@ -16,7 +16,7 @@ const calculateIPFGL = (squat, bench, deadlift, bw) => {
   const A = 1199.72839, B = 1025.18162, C = 0.00921;
   return parseFloat(((total * 100) / (A - B * Math.exp(-C * bw))).toFixed(2));
 };
-con
+
 // --- DOTS MATH ENGINE ---
 const calculateDOTS = (total, bw) => {
   if (!bw || bw <= 0 || total === 0) return 0;
