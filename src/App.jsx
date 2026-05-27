@@ -200,7 +200,18 @@ export default function App() {
     if (activeTab === 'training-log') fetchTrainingLogs(session.user.id);
   }, [activeTab]);
 
-  const handleGoogleLogin = async () => { const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' }); if (error) setErrorMsg(error.message); };
+  const handleGoogleLogin = async (e) => {
+    // 1. THIS IS THE KEY FIX: Prevent the browser's default behavior
+    if (e) e.preventDefault(); 
+    
+    const { error } = await supabase.auth.signInWithOAuth({ 
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin // Tells Google exactly where to send the user back
+      }
+    }); 
+    if (error) setErrorMsg(error.message); 
+  };
   const handleLogout = async () => { await supabase.auth.signOut(); };
 
   const handleUpdateStats = async (e) => {
