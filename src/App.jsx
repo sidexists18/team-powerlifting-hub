@@ -315,19 +315,20 @@ export default function App() {
   };
 
 
-  // =========================================================================
+// =========================================================================
   // --- THE GATEKEEPER PROTOCOL ---
   // =========================================================================
 
   const currentUserEmail = session?.user?.email?.toLowerCase().trim() || '';
   const isViceCaptain = VICE_CAPTAINS.includes(currentUserEmail);
   
-  // 1. Domain Check
-  //const isAllowedEmail = currentUserEmail.endsWith('@goa.bits-pilani.ac.in') || isViceCaptain;
-    const isAllowedEmail = true;
+  // 1. Domain Check (TEMPORARILY UNLOCKED FOR TESTING)
+  const isAllowedEmail = true;
+  
   // 2. Approval Check
   const isApproved = isViceCaptain || profile?.is_approved === true;
 
+ 
   // SCREEN 1: Not Logged In
   if (!session) {
     return (
