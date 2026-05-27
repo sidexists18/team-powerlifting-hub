@@ -29,7 +29,7 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [theme, setTheme] = useState(localStorage.getItem('app-theme') || 'classic');
-
+  
   // --- NEW USER ONBOARDING STATES ---
   const [registrationName, setRegistrationName] = useState('');
   const [showNameForm, setShowNameForm] = useState(false);
@@ -201,17 +201,17 @@ export default function App() {
   }, [activeTab]);
 
   const handleGoogleLogin = async (e) => {
-    // 1. THIS IS THE KEY FIX: Prevent the browser's default behavior
     if (e) e.preventDefault(); 
     
     const { error } = await supabase.auth.signInWithOAuth({ 
       provider: 'google',
       options: {
-        redirectTo: window.location.origin // Tells Google exactly where to send the user back
+        redirectTo: window.location.origin 
       }
     }); 
     if (error) setErrorMsg(error.message); 
   };
+  
   const handleLogout = async () => { await supabase.auth.signOut(); };
 
   const handleUpdateStats = async (e) => {
@@ -266,7 +266,7 @@ export default function App() {
   };
   
   const handleUpdateLog = async (id) => {
-    const { error } = await supabase.from('training_logs').update({ weight_kg: parseFloat(editWeight), sets: parseInt(editSets), reps: parseInt(editReps), rpe: editRpe ? parseFloat(editRpe) : null }).eq('id', id);
+    const { error } = await supabase.from('training_logs').update({ weight_kg: parseFloat(editWeight), sets: parseInt(editSets), reps: parseInt(editReps), rpe: editRpe ? parseFloat(editRpe) : null, date: logDate }).eq('id', id);
     if (!error) { setEditingLogId(null); fetchTrainingLogs(session.user.id); }
   };
 
@@ -314,34 +314,34 @@ export default function App() {
     );
   };
 
-
-// =========================================================================
+  // =========================================================================
   // --- THE GATEKEEPER PROTOCOL ---
   // =========================================================================
 
   const currentUserEmail = session?.user?.email?.toLowerCase().trim() || '';
   const isViceCaptain = VICE_CAPTAINS.includes(currentUserEmail);
   
-  // 1. Domain Check (TEMPORARILY UNLOCKED FOR TESTING)
-  const isAllowedEmail = true;
+  // 1. Domain Check - STRICTLY LOCKED
+  const isAllowedEmail = currentUserEmail.endsWith('@goa.bits-pilani.ac.in') || isViceCaptain;
   
   // 2. Approval Check
   const isApproved = isViceCaptain || profile?.is_approved === true;
 
- 
   // SCREEN 1: Not Logged In
   if (!session) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)' }}>
-        <div className="w-full max-w-md border rounded-2xl p-8 shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-main)' }}>Team Login</h1>
-            <p className="text-sm mt-6 mb-2" style={{ color: 'var(--text-muted)' }}>Authenticate to access the team hub.</p>
+      <div className="h-screen w-screen overflow-y-auto font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)' }}>
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+          <div className="w-full max-w-md border rounded-2xl p-8 shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="mb-6 text-center">
+              <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-main)' }}>Team Login</h1>
+              <p className="text-sm mt-6 mb-2" style={{ color: 'var(--text-muted)' }}>Authenticate to access the team hub.</p>
+            </div>
+            <button onClick={handleGoogleLogin} className="w-full font-extrabold py-3.5 rounded-lg flex items-center justify-center gap-3 transition-transform hover:scale-105 active:scale-95 bg-white text-slate-900 shadow-md border border-slate-200">
+              <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" /> 
+              Sign in with Google
+            </button>
           </div>
-          <button onClick={handleGoogleLogin} className="w-full font-extrabold py-3.5 rounded-lg flex items-center justify-center gap-3 transition-transform hover:scale-105 active:scale-95 bg-white text-slate-900 shadow-md border border-slate-200">
-            <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" /> 
-            Sign in with Google
-          </button>
         </div>
       </div>
     );
@@ -350,11 +350,13 @@ export default function App() {
   // SCREEN 2: Wrong Email Domain
   if (!isAllowedEmail) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)' }}>
-        <div className="w-full max-w-md border rounded-2xl p-8 shadow-xl text-center" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-          <h1 className="text-2xl font-black tracking-tight text-rose-500 mb-2">Unauthorized Domain</h1>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>You must use a valid @goa.bits-pilani.ac.in email to access this hub.</p>
-          <button onClick={handleLogout} className="font-bold py-2 px-4 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20">Sign Out</button>
+      <div className="h-screen w-screen overflow-y-auto font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)' }}>
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+          <div className="w-full max-w-md border rounded-2xl p-8 shadow-xl text-center" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h1 className="text-2xl font-black tracking-tight text-rose-500 mb-2">Unauthorized Domain</h1>
+            <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>You must use a valid @goa.bits-pilani.ac.in email to access this hub.</p>
+            <button onClick={handleLogout} className="font-bold py-2 px-4 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20">Sign Out</button>
+          </div>
         </div>
       </div>
     );
@@ -363,34 +365,36 @@ export default function App() {
   // SCREEN 2.5: MANUALLY COLLECT NAME IF NEW USER
   if (showNameForm) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)' }}>
-        <div className="w-full max-w-md border rounded-2xl p-8 shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-main)' }}>Complete Registration</h1>
-            <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>Enter your name to request access to the team platform.</p>
-          </div>
-          
-          <form onSubmit={handleRegisterProfile} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Full Name</label>
-              <input 
-                type="text" 
-                required 
-                placeholder="e.g. Kunal Sharma"
-                value={registrationName} 
-                onChange={(e) => setRegistrationName(e.target.value)} 
-                className="w-full border rounded-lg px-4 py-2.5 text-sm outline-none"
-                style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
-              />
+      <div className="h-screen w-screen overflow-y-auto font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)' }}>
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+          <div className="w-full max-w-md border rounded-2xl p-8 shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <div className="mb-6 text-center">
+              <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-main)' }}>Complete Registration</h1>
+              <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>Enter your name to request access to the team platform.</p>
             </div>
-            <button 
-              type="submit" 
-              className="w-full font-bold py-3 rounded-lg border transition-transform active:scale-95 text-sm" 
-              style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-text)', borderColor: 'var(--border-color)' }}
-            >
-              Submit Membership Request
-            </button>
-          </form>
+            
+            <form onSubmit={handleRegisterProfile} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Full Name</label>
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="e.g. Kunal Sharma"
+                  value={registrationName} 
+                  onChange={(e) => setRegistrationName(e.target.value)} 
+                  className="w-full border rounded-lg px-4 py-2.5 text-sm outline-none"
+                  style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
+                />
+              </div>
+              <button 
+                type="submit" 
+                className="w-full font-bold py-3 rounded-lg border transition-transform active:scale-95 text-sm" 
+                style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-text)', borderColor: 'var(--border-color)' }}
+              >
+                Submit Membership Request
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     );
@@ -404,11 +408,13 @@ export default function App() {
   // SCREEN 4: Pending Admin Verification
   if (!isApproved) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)' }}>
-        <div className="w-full max-w-md border rounded-2xl p-8 shadow-xl text-center" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-          <h1 className="text-2xl font-black tracking-tight text-amber-500 mb-2">Pending Approval</h1>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>Your account is waiting for manual verification from the Leadership Council.</p>
-          <button onClick={handleLogout} className="font-bold py-2 px-4 rounded-lg border hover:bg-slate-500/10 transition-colors" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>Sign Out</button>
+      <div className="h-screen w-screen overflow-y-auto font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)' }}>
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+          <div className="w-full max-w-md border rounded-2xl p-8 shadow-xl text-center" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+            <h1 className="text-2xl font-black tracking-tight text-amber-500 mb-2">Pending Approval</h1>
+            <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>Your account is waiting for manual verification from the Leadership Council.</p>
+            <button onClick={handleLogout} className="font-bold py-2 px-4 rounded-lg border hover:bg-slate-500/10 transition-colors" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>Sign Out</button>
+          </div>
         </div>
       </div>
     );
@@ -429,7 +435,7 @@ export default function App() {
   const finalWelcomeName = profile?.full_name || 'Athlete';
 
   return (
-    <div className="min-h-screen font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}>
+    <div className="h-screen w-screen overflow-y-auto font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}>
       
       {/* NAVBAR WITH FLEX-WRAP FIX */}
       <nav className="border-b backdrop-blur sticky top-0 z-50 transition-colors duration-200" style={{ backgroundColor: 'var(--bg-card)80', borderColor: 'var(--border-color)' }}>
@@ -471,11 +477,35 @@ export default function App() {
             <div className="border rounded-xl p-6 transition-colors" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               <h2 className="text-xl font-bold mb-4">Log New Workout</h2>
               <form onSubmit={handleLogWorkout} className="space-y-4">
+                
+                {/* TOP ROW: DATE AND EXERCISE SELECTION */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                  <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Date</label><input type="date" required value={logDate} onChange={(e) => setLogDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
-                  <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Movement</label><select value={logMovementSelect} onChange={(e) => setLogMovementSelect(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}><option value="Squat">Squat</option><option value="Bench Press">Bench Press</option><option value="Deadlift">Deadlift</option><option value="Accessory">Other Accessory...</option></select></div>
-                  {logMovementSelect === 'Accessory' && (<div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Exercise Name</label><input type="text" placeholder="e.g. Overhead Press" required value={customMovement} onChange={(e) => setCustomMovement(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>)}
+                  <div>
+                    <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Workout Date</label>
+                    <input 
+                      type="date" 
+                      required 
+                      value={logDate} 
+                      onChange={(e) => setLogDate(e.target.value)} 
+                      className="w-full border rounded-lg px-3 py-2 outline-none" 
+                      style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)', colorScheme: 'dark' }} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Movement</label>
+                    <select value={logMovementSelect} onChange={(e) => setLogMovementSelect(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+                      <option value="Squat">Squat</option><option value="Bench Press">Bench Press</option><option value="Deadlift">Deadlift</option><option value="Accessory">Other Accessory...</option>
+                    </select>
+                  </div>
+                  {logMovementSelect === 'Accessory' && (
+                    <div>
+                      <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Exercise Name</label>
+                      <input type="text" placeholder="e.g. Overhead Press" required value={customMovement} onChange={(e) => setCustomMovement(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                    </div>
+                  )}
                 </div>
+
+                {/* BOTTOM ROW: SET DATA */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                   <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Weight (kg)</label><input type="number" step="0.5" required value={logWeight} onChange={(e) => setLogWeight(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
                   <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Set Number</label><input type="number" placeholder="e.g. 1" required value={logSets} onChange={(e) => setLogSets(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
