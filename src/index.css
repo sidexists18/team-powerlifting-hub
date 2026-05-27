@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -----------------------------------------
+   DYNAMIC THEME VARIABLES FOR APP.JSX
+----------------------------------------- */
+
+/* Default / Dark Theme */
+:root, [data-theme="dark"] {
+  --bg-main: #0f172a;      
+  --bg-card: #1e293b;      
+  --bg-input: #0f172a;     
+  --text-main: #f8fafc;    
+  --text-muted: #94a3b8;   
+  --border-color: #334155; 
+  --accent-color: #3b82f6; 
+  --accent-text: #ffffff;
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-input: #f1f5f9;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --accent-color: #2563eb;
+  --accent-text: #ffffff;
+}
+
+/* Classic Pitch Black Theme */
+[data-theme="classic"] {
+  --bg-main: #000000;
+  --bg-card: #111111;
+  --bg-input: #000000;
+  --text-main: #ffffff;
+  --text-muted: #888888;
+  --border-color: #333333;
+  --accent-color: #3b82f6;
+  --accent-text: #ffffff;
+}
+
+/* -----------------------------------------
+   LAYOUT OVERRIDES & RESETS
+----------------------------------------- */
+
+/* Completely remove Vite's restrictive default container */
+#root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  border: none;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar for a cleaner look */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
