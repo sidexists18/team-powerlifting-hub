@@ -89,15 +89,25 @@ export default function App() {
   useEffect(() => { localStorage.setItem('team-gallery-v3', JSON.stringify(galleryImages)); }, [galleryImages]);
 
   // --- AUTO-PROFILER FUNCTION ---
+// --- AUTO-PROFILER FUNCTION ---
   const fetchProfile = async (userId) => {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    
     if (data) {
       setProfile(data);
       if (data.full_name) setDisplayNameInput(data.full_name);
     } else {
-      // If profile doesn't exist, instantly create a blank one so Admin can approve them
-      const { data: newProfile } = await supabase.from('profiles').insert([{ id: userId, is_approved: false }]).select().single();
-      if (newProfile) setProfile(newProfile);
+      // If profile doesn't exist, attempt to inject a blank one
+      const { data: newProfile, error: insertError } = await supabase.from('profiles').insert([{ id: userId, is_approved: false }]).select().single();
+      
+      if (newProfile) {
+        setProfile(newProfile);
+      } else {
+        // ANTI-FREEZE PROTOCOL: If the database rejects the insert for any reason,
+        // log the error to the console and force a fallback profile so the app doesn't hang!
+        console.error("Database Insert Blocked:", insertError);
+        setProfile({ id: userId, is_approved: false, full_name: 'Incoming Athlete' });
+      }
     }
   };
 
@@ -431,8 +441,8 @@ export default function App() {
                               <span>{mKey}</span><span className="text-xs font-normal underline" style={{ color: 'var(--text-muted)' }}>{expandedExercises[`${dateKey}-${mKey}`] ? 'Hide Sets' : 'View Sets'}</span>
                             </button>
                             {expandedExercises[`${dateKey}-${mKey}`] && (
-                              <div className="border-t p-2" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-main)10' }}>
-                                <table className="w-full text-left text-xs">
+                               <div className="border-t p-2 overflow-x-auto" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-main)10' }}>
+  <table className="w-full text-left text-xs whitespace-nowrap min-w-max">
                                   <thead><tr className="border-b" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}><th className="px-4 py-2">Set</th><th className="px-4 py-2">Weight</th><th className="px-4 py-2">Reps</th><th className="px-4 py-2">RPE</th><th className="px-4 py-2 text-right">Actions</th></tr></thead>
                                   <tbody>
                                     {userPersonalLogs[dateKey][mKey].map((log) => (
@@ -542,8 +552,8 @@ export default function App() {
                 <option value="squat">Max Squat</option><option value="bench">Max Bench</option><option value="deadlift">Max Deadlift</option><option value="total">Max Total</option>
               </select>
             </div>
-            <div className="border rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-              <table className="w-full text-left text-sm">
+            <div className="border rounded-xl overflow-x-auto shadow-inner" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+             <table className="w-full text-left text-sm whitespace-nowrap min-w-max">
                 <thead className="text-xs uppercase font-bold border-b" style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>
                   <tr>
                     <th className="px-4 py-4">Rank</th><th className="px-4 py-4">Athlete</th><th className="px-4 py-4" style={headingStyle('ratio')}>BW</th><th className="px-4 py-4" style={headingStyle('squat')}>Squat</th><th className="px-4 py-4" style={headingStyle('bench')}>Bench</th><th className="px-4 py-4" style={headingStyle('deadlift')}>Deadlift</th><th className="px-4 py-4" style={headingStyle('total')}>Total</th><th className="px-4 py-4" style={headingStyle('ipf')}>IPF GL</th><th className="px-4 py-4" style={headingStyle('dots')}>DOTS</th>
