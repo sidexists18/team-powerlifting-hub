@@ -30,6 +30,10 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [theme, setTheme] = useState(localStorage.getItem('app-theme') || 'classic');
 
+  // --- NEW USER ONBOARDING STATES ---
+  const [registrationName, setRegistrationName] = useState('');
+  const [showNameForm, setShowNameForm] = useState(false);
+
   // --- LIFT UPDATE STATES ---
   const [displayNameInput, setDisplayNameInput] = useState('');
   const [squat, setSquat] = useState('');
@@ -89,25 +93,35 @@ export default function App() {
   useEffect(() => { localStorage.setItem('team-gallery-v3', JSON.stringify(galleryImages)); }, [galleryImages]);
 
   // --- AUTO-PROFILER FUNCTION ---
-// --- AUTO-PROFILER FUNCTION ---
   const fetchProfile = async (userId) => {
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    
-    if (data) {
-      setProfile(data);
-      if (data.full_name) setDisplayNameInput(data.full_name);
+    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single();
+
+    if (profileData) {
+      setProfile(profileData);
+      if (profileData.full_name) setDisplayNameInput(profileData.full_name);
+      setShowNameForm(false);
     } else {
-      // If profile doesn't exist, attempt to inject a blank one
-      const { data: newProfile, error: insertError } = await supabase.from('profiles').insert([{ id: userId, is_approved: false }]).select().single();
-      
-      if (newProfile) {
-        setProfile(newProfile);
-      } else {
-        // ANTI-FREEZE PROTOCOL: If the database rejects the insert for any reason,
-        // log the error to the console and force a fallback profile so the app doesn't hang!
-        console.error("Database Insert Blocked:", insertError);
-        setProfile({ id: userId, is_approved: false, full_name: 'Incoming Athlete' });
-      }
+      setShowNameForm(true);
+    }
+  };
+
+  const handleRegisterProfile = async (e) => {
+    e.preventDefault();
+    if (!registrationName.trim()) return;
+
+    const { data: newProfile, error: insertError } = await supabase
+      .from('profiles')
+      .insert([{ id: session.user.id, full_name: registrationName.trim(), is_approved: false }])
+      .select()
+      .single();
+
+    if (newProfile) {
+      setProfile(newProfile);
+      if (newProfile.full_name) setDisplayNameInput(newProfile.full_name);
+      setShowNameForm(false);
+    } else {
+      console.error("Profile registration error:", insertError);
+      alert("Failed to register name parameters. Verify database connection permissions.");
     }
   };
 
@@ -174,7 +188,7 @@ export default function App() {
       setSession(session); if (session) { fetchProfile(session.user.id); fetchLiftHistory(session.user.id); fetchLeaderboard(); fetchTrainingLogs(session.user.id); }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session); if (session) { fetchProfile(session.user.id); fetchLiftHistory(session.user.id); fetchLeaderboard(); fetchTrainingLogs(session.user.id); } else { setProfile(null); setLiftHistory([]); setLeaderboard([]); setTrainingHistory([]); }
+      setSession(session); if (session) { fetchProfile(session.user.id); fetchLiftHistory(session.user.id); fetchLeaderboard(); fetchTrainingLogs(session.user.id); } else { setProfile(null); setLiftHistory([]); setLeaderboard([]); setTrainingHistory([]); setShowNameForm(false); }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -192,7 +206,7 @@ export default function App() {
   const handleUpdateStats = async (e) => {
     e.preventDefault(); setIsUpdating(true);
     const sVal = parseFloat(squat), bVal = parseFloat(bench), dVal = parseFloat(deadlift), bwVal = parseFloat(bodyweight), calculatedTotal = sVal + bVal + dVal;
-    const finalName = displayNameInput.trim() || profile?.full_name || session?.user?.user_metadata?.full_name || session?.user?.user_metadata?.name || 'Athlete';
+    const finalName = displayNameInput.trim() || profile?.full_name || 'Athlete';
 
     const { error: pErr } = await supabase.from('profiles').update({ 
       best_squat: sVal, best_bench: bVal, best_deadlift: dVal, current_bodyweight: bwVal, full_name: finalName
@@ -334,7 +348,43 @@ export default function App() {
     );
   }
 
-  // SCREEN 3: Loading Profile Data (Crucial for new sign-ups)
+  // SCREEN 2.5: MANUALLY COLLECT NAME IF NEW USER
+  if (showNameForm) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)' }}>
+        <div className="w-full max-w-md border rounded-2xl p-8 shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+          <div className="mb-6 text-center">
+            <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text-main)' }}>Complete Registration</h1>
+            <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>Enter your name to request access to the team platform.</p>
+          </div>
+          
+          <form onSubmit={handleRegisterProfile} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Full Name</label>
+              <input 
+                type="text" 
+                required 
+                placeholder="e.g. Kunal Sharma"
+                value={registrationName} 
+                onChange={(e) => setRegistrationName(e.target.value)} 
+                className="w-full border rounded-lg px-4 py-2.5 text-sm outline-none"
+                style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} 
+              />
+            </div>
+            <button 
+              type="submit" 
+              className="w-full font-bold py-3 rounded-lg border transition-transform active:scale-95 text-sm" 
+              style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-text)', borderColor: 'var(--border-color)' }}
+            >
+              Submit Membership Request
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // SCREEN 3: Loading Profile Data (Crucial for sync windows)
   if (!profile) {
     return <div className="min-h-screen flex items-center justify-center font-bold" style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-muted)' }}>Syncing secure athlete profile...</div>;
   }
@@ -364,7 +414,7 @@ export default function App() {
   const currentCarbs = dailyFoods.reduce((sum, item) => sum + (item.carbs || 0), 0);
   const currentFats = dailyFoods.reduce((sum, item) => sum + (item.fats || 0), 0);
 
-  const finalWelcomeName = profile?.full_name || session?.user?.user_metadata?.full_name || session?.user?.user_metadata?.name || 'Athlete';
+  const finalWelcomeName = profile?.full_name || 'Athlete';
 
   return (
     <div className="min-h-screen font-sans transition-colors duration-200" style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}>
@@ -441,8 +491,8 @@ export default function App() {
                               <span>{mKey}</span><span className="text-xs font-normal underline" style={{ color: 'var(--text-muted)' }}>{expandedExercises[`${dateKey}-${mKey}`] ? 'Hide Sets' : 'View Sets'}</span>
                             </button>
                             {expandedExercises[`${dateKey}-${mKey}`] && (
-                               <div className="border-t p-2 overflow-x-auto" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-main)10' }}>
-  <table className="w-full text-left text-xs whitespace-nowrap min-w-max">
+                              <div className="border-t p-2 overflow-x-auto" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-main)10' }}>
+                                <table className="w-full text-left text-xs whitespace-nowrap min-w-max">
                                   <thead><tr className="border-b" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}><th className="px-4 py-2">Set</th><th className="px-4 py-2">Weight</th><th className="px-4 py-2">Reps</th><th className="px-4 py-2">RPE</th><th className="px-4 py-2 text-right">Actions</th></tr></thead>
                                   <tbody>
                                     {userPersonalLogs[dateKey][mKey].map((log) => (
@@ -553,7 +603,7 @@ export default function App() {
               </select>
             </div>
             <div className="border rounded-xl overflow-x-auto shadow-inner" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-             <table className="w-full text-left text-sm whitespace-nowrap min-w-max">
+              <table className="w-full text-left text-sm whitespace-nowrap min-w-max">
                 <thead className="text-xs uppercase font-bold border-b" style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>
                   <tr>
                     <th className="px-4 py-4">Rank</th><th className="px-4 py-4">Athlete</th><th className="px-4 py-4" style={headingStyle('ratio')}>BW</th><th className="px-4 py-4" style={headingStyle('squat')}>Squat</th><th className="px-4 py-4" style={headingStyle('bench')}>Bench</th><th className="px-4 py-4" style={headingStyle('deadlift')}>Deadlift</th><th className="px-4 py-4" style={headingStyle('total')}>Total</th><th className="px-4 py-4" style={headingStyle('ipf')}>IPF GL</th><th className="px-4 py-4" style={headingStyle('dots')}>DOTS</th>
