@@ -16,7 +16,7 @@ const calculateIPFGL = (squat, bench, deadlift, bw) => {
   const A = 1199.72839, B = 1025.18162, C = 0.00921;
   return parseFloat(((total * 100) / (A - B * Math.exp(-C * bw))).toFixed(2));
 };
-
+con
 // --- DOTS MATH ENGINE ---
 const calculateDOTS = (total, bw) => {
   if (!bw || bw <= 0 || total === 0) return 0;
@@ -323,8 +323,8 @@ export default function App() {
   const isViceCaptain = VICE_CAPTAINS.includes(currentUserEmail);
   
   // 1. Domain Check
-  const isAllowedEmail = currentUserEmail.endsWith('@goa.bits-pilani.ac.in') || isViceCaptain;
-  
+  //const isAllowedEmail = currentUserEmail.endsWith('@goa.bits-pilani.ac.in') || isViceCaptain;
+    const isAllowedEmail = true;
   // 2. Approval Check
   const isApproved = isViceCaptain || profile?.is_approved === true;
 
