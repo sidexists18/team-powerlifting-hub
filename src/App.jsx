@@ -8,19 +8,31 @@ const VICE_CAPTAINS = [
   'f20241051@goa.bits-pilani.ac.in'
 ];
 
-// --- IPF GL MATH ENGINE ---
-const calculateIPFGL = (squat, bench, deadlift, bw) => {
+// --- IPF GL MATH ENGINE (GENDER AWARE) ---
+const calculateIPFGL = (squat, bench, deadlift, bw, gender) => {
   if (!bw || bw <= 0) return 0;
   const total = (squat || 0) + (bench || 0) + (deadlift || 0);
   if (total === 0) return 0;
-  const A = 1199.72839, B = 1025.18162, C = 0.00921;
+  
+  const isFemale = gender === 'Female';
+  const A = isFemale ? 610.32796 : 1199.72839;
+  const B = isFemale ? 1045.59282 : 1025.18162;
+  const C = isFemale ? 0.03048 : 0.00921;
+  
   return parseFloat(((total * 100) / (A - B * Math.exp(-C * bw))).toFixed(2));
 };
 
-// --- DOTS MATH ENGINE ---
-const calculateDOTS = (total, bw) => {
+// --- DOTS MATH ENGINE (GENDER AWARE) ---
+const calculateDOTS = (total, bw, gender) => {
   if (!bw || bw <= 0 || total === 0) return 0;
-  const a = -307.27237, b = 24.0900756, c = -0.1918759221, d = 0.0007391293, e = -0.0000010930;
+  
+  const isFemale = gender === 'Female';
+  const a = isFemale ? -57.96288 : -307.27237;
+  const b = isFemale ? 13.6175032 : 24.0900756;
+  const c = isFemale ? -0.1126655495 : -0.1918759221;
+  const d = isFemale ? 0.0005158568 : 0.0007391293;
+  const e = isFemale ? -0.0000010706 : -0.0000010930;
+  
   return parseFloat(((total * 500) / (a + b * bw + c * Math.pow(bw, 2) + d * Math.pow(bw, 3) + e * Math.pow(bw, 4))).toFixed(2));
 };
 
@@ -36,6 +48,7 @@ export default function App() {
 
   // --- LIFT UPDATE STATES ---
   const [displayNameInput, setDisplayNameInput] = useState('');
+  const [genderInput, setGenderInput] = useState('Male');
   const [squat, setSquat] = useState('');
   const [bench, setBench] = useState('');
   const [deadlift, setDeadlift] = useState('');
@@ -76,7 +89,7 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [sortBy, setSortBy] = useState('ipf');
 
-  // --- NUTRITION & GALLERY STATES ---
+  // --- NUTRITION STATES ---
   const [targetCalories, setTargetCalories] = useState(parseInt(localStorage.getItem('cal-target')) || 2500);
   const [targetProtein, setTargetProtein] = useState(parseInt(localStorage.getItem('macro-p-target')) || 160);
   const [targetCarbs, setTargetCarbs] = useState(parseInt(localStorage.getItem('macro-c-target')) || 250);
@@ -84,13 +97,10 @@ export default function App() {
   const [foodName, setFoodName] = useState(''); const [foodCalories, setFoodCalories] = useState('');
   const [foodProtein, setFoodProtein] = useState(''); const [foodCarbs, setFoodCarbs] = useState('');
   const [foodFats, setFoodFats] = useState(''); const [dailyFoods, setDailyFoods] = useState(JSON.parse(localStorage.getItem('cal-foods-v2')) || []);
-  const [imageFileString, setImageFileString] = useState(''); const [imageCaption, setImageCaption] = useState('');
-  const [galleryImages, setGalleryImages] = useState(JSON.parse(localStorage.getItem('team-gallery-v3')) || []);
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('app-theme', theme); }, [theme]);
   useEffect(() => { localStorage.setItem('cal-target', targetCalories); localStorage.setItem('macro-p-target', targetProtein); localStorage.setItem('macro-c-target', targetCarbs); localStorage.setItem('macro-f-target', targetFats); }, [targetCalories, targetProtein, targetCarbs, targetFats]);
   useEffect(() => { localStorage.setItem('cal-foods-v2', JSON.stringify(dailyFoods)); }, [dailyFoods]);
-  useEffect(() => { localStorage.setItem('team-gallery-v3', JSON.stringify(galleryImages)); }, [galleryImages]);
 
   // --- AUTO-PROFILER FUNCTION ---
   const fetchProfile = async (userId) => {
@@ -99,6 +109,7 @@ export default function App() {
     if (profileData) {
       setProfile(profileData);
       if (profileData.full_name) setDisplayNameInput(profileData.full_name);
+      if (profileData.gender) setGenderInput(profileData.gender);
       setShowNameForm(false);
     } else {
       setShowNameForm(true);
@@ -111,13 +122,14 @@ export default function App() {
 
     const { data: newProfile, error: insertError } = await supabase
       .from('profiles')
-      .insert([{ id: session.user.id, full_name: registrationName.trim(), is_approved: false }])
+      .insert([{ id: session.user.id, full_name: registrationName.trim(), is_approved: false, gender: 'Male' }])
       .select()
       .single();
 
     if (newProfile) {
       setProfile(newProfile);
       if (newProfile.full_name) setDisplayNameInput(newProfile.full_name);
+      if (newProfile.gender) setGenderInput(newProfile.gender);
       setShowNameForm(false);
     } else {
       console.error("Profile registration error:", insertError);
@@ -135,7 +147,7 @@ export default function App() {
     if (data) {
       const enriched = data.map(athlete => {
         const s = athlete.best_squat || 0, b = athlete.best_bench || 0, d = athlete.best_deadlift || 0, bw = athlete.current_bodyweight || 1, total = s + b + d;
-        return { ...athlete, squat: s, bench: b, deadlift: d, total, bw, glScore: calculateIPFGL(s, b, d, bw), dotsScore: calculateDOTS(total, bw), bwRatio: parseFloat((total / bw).toFixed(2)) };
+        return { ...athlete, squat: s, bench: b, deadlift: d, total, bw, glScore: calculateIPFGL(s, b, d, bw, athlete.gender), dotsScore: calculateDOTS(total, bw, athlete.gender), bwRatio: parseFloat((total / bw).toFixed(2)) };
       });
       setLeaderboard(enriched);
       setAllProfiles(data); 
@@ -220,7 +232,7 @@ export default function App() {
     const finalName = displayNameInput.trim() || profile?.full_name || 'Athlete';
 
     const { error: pErr } = await supabase.from('profiles').update({ 
-      best_squat: sVal, best_bench: bVal, best_deadlift: dVal, current_bodyweight: bwVal, full_name: finalName
+      best_squat: sVal, best_bench: bVal, best_deadlift: dVal, current_bodyweight: bwVal, full_name: finalName, gender: genderInput
     }).eq('id', session.user.id);
 
     const { error: hErr } = await supabase.from('lift_history').insert([{ user_id: session.user.id, date: updateDate, bodyweight: bwVal, squat: sVal, bench: bVal, deadlift: dVal, total: calculatedTotal }]);
@@ -276,10 +288,6 @@ export default function App() {
     setFoodName(''); setFoodCalories(''); setFoodProtein(''); setFoodCarbs(''); setFoodFats('');
   };
   const clearCalories = () => { if (window.confirm("Reset your nutrition log for today?")) setDailyFoods([]); };
-
-  const handleFileChange = (e) => { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onloadend = () => { setImageFileString(r.result); }; r.readAsDataURL(file); };
-  const handleAddImage = (e) => { e.preventDefault(); if (!imageFileString) return; setGalleryImages([{ id: Date.now(), url: imageFileString, caption: imageCaption || 'Fun lift content' }, ...galleryImages]); setImageFileString(''); setImageCaption(''); document.getElementById('gallery-file-input').value = ''; };
-  const handleDeleteImage = (id) => { if (window.confirm("Remove image?")) setGalleryImages(galleryImages.filter(img => img.id !== id)); };
 
   const headingStyle = (metric) => { return sortBy === metric ? { backgroundColor: 'var(--accent-color)', color: 'var(--accent-text)' } : {}; };
 
@@ -446,7 +454,7 @@ export default function App() {
           </div>
           
           <div className="flex flex-wrap gap-2 items-center">
-            {['training-log', 'dashboard', 'leaderboard', 'calories', 'gallery'].map((tab) => (
+            {['training-log', 'dashboard', 'leaderboard', 'calories'].map((tab) => (
               <button key={tab} onClick={() => setActiveTab(tab)} className="px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold capitalize transition-all" style={{ backgroundColor: activeTab === tab ? 'var(--accent-color)' : 'transparent', color: activeTab === tab ? 'var(--accent-text)' : 'var(--text-muted)' }}>
                 {tab.replace('-', ' ')}
               </button>
@@ -498,7 +506,7 @@ export default function App() {
                     </select>
                   </div>
                   {logMovementSelect === 'Accessory' && (
-                    <div>
+                    <div className="md:col-span-1">
                       <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Exercise Name</label>
                       <input type="text" placeholder="e.g. Overhead Press" required value={customMovement} onChange={(e) => setCustomMovement(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
                     </div>
@@ -506,13 +514,13 @@ export default function App() {
                 </div>
 
                 {/* BOTTOM ROW: SET DATA */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end mt-4">
                   <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Weight (kg)</label><input type="number" step="0.5" required value={logWeight} onChange={(e) => setLogWeight(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
                   <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Set Number</label><input type="number" placeholder="e.g. 1" required value={logSets} onChange={(e) => setLogSets(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
                   <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Reps</label><input type="number" required value={logReps} onChange={(e) => setLogReps(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
                   <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">RPE</label><input type="number" step="0.5" min="1" max="10" required value={logRpe} onChange={(e) => setLogRpe(e.target.value)} placeholder="e.g. 8.5" className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
                 </div>
-                <button type="submit" className="w-full font-bold py-2.5 rounded-lg border mt-2" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-text)', borderColor: 'var(--border-color)' }}>Save Workout</button>
+                <button type="submit" className="w-full font-bold py-2.5 rounded-lg border mt-4" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-text)', borderColor: 'var(--border-color)' }}>Save Workout</button>
               </form>
             </div>
 
@@ -568,7 +576,7 @@ export default function App() {
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
             <div><h1 className="text-3xl font-extrabold tracking-tight">Team Dashboard</h1><p className="mt-1" style={{ color: 'var(--text-muted)' }}>Welcome back, <span className="font-bold" style={{ color: 'var(--accent-color)' }}>{finalWelcomeName}</span>.</p></div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[['Your Squat', profile?.best_squat, 'kg'], ['Your Bench', profile?.best_bench, 'kg'], ['Your Deadlift', profile?.best_deadlift, 'kg']].map(([label, val, unit]) => (
                 <div key={label} className="border p-6 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                   <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</span>
@@ -577,12 +585,12 @@ export default function App() {
               ))}
               <div className="border p-6 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                 <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Your IPF GL</span>
-                <div className="text-3xl font-black mt-2">{profile ? calculateIPFGL(profile.best_squat, profile.best_bench, profile.best_deadlift, profile.current_bodyweight) : '0'} <span className="text-sm font-normal" style={{ color: 'var(--text-muted)' }}>pts</span></div>
+                <div className="text-3xl font-black mt-2">{profile ? calculateIPFGL(profile.best_squat, profile.best_bench, profile.best_deadlift, profile.current_bodyweight, profile.gender) : '0'} <span className="text-sm font-normal" style={{ color: 'var(--text-muted)' }}>pts</span></div>
               </div>
             </div>
 
             <div className="border rounded-xl p-6 shadow-sm" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div><h2 className="text-xl font-bold">Strength Progression Tracker</h2><p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Hover anchors to analyze training blocks curves.</p></div>
                 <div className="flex gap-1.5 border rounded-lg p-1 text-xs font-bold" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-main)' }}>
                   {['total', 'squat', 'bench', 'deadlift'].map(m => (<button key={m} onClick={() => setChartMetric(m)} className="px-2.5 py-1.5 rounded-md capitalize transition-all" style={{ backgroundColor: chartMetric === m ? 'var(--accent-color)' : 'transparent', color: chartMetric === m ? 'var(--accent-text)' : 'var(--text-muted)' }}>{m}</button>))}
@@ -617,12 +625,19 @@ export default function App() {
             <div className="border rounded-xl p-6 mt-8" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               <h2 className="text-xl font-bold mb-4">Update Current Maxes & Details</h2>
               <form onSubmit={handleUpdateStats} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Full Name / Display Name</label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                  <div className="col-span-2 md:col-span-2">
+                    <label className="block text-xs font-bold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Full Name</label>
                     <input type="text" placeholder="e.g. Sidhant Bhutani" value={displayNameInput} onChange={(e) => setDisplayNameInput(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
                   </div>
-                  <div><label className="block text-xs font-bold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Log Date</label><input type="date" required value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Gender</label>
+                    <select value={genderInput} onChange={(e) => setGenderInput(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+                  <div><label className="block text-xs font-bold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Log Date</label><input type="date" required value={updateDate} onChange={(e) => setUpdateDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)', colorScheme: 'dark' }} /></div>
                   <div><label className="block text-xs font-bold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>BW (kg)</label><input type="number" step="0.1" required value={bodyweight} onChange={(e) => setBodyweight(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
                   <div><label className="block text-xs font-bold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Squat (kg)</label><input type="number" step="2.5" required value={squat} onChange={(e) => setSquat(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
                   <div><label className="block text-xs font-bold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Bench (kg)</label><input type="number" step="2.5" required value={bench} onChange={(e) => setBench(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
@@ -637,9 +652,9 @@ export default function App() {
         {/* TAB 3: LEADERBOARD */}
         {activeTab === 'leaderboard' && (
           <div className="space-y-6">
-             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-              <div><h1 className="text-3xl font-extrabold tracking-tight">Team Rankings</h1></div>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="border rounded-lg px-4 py-2 outline-none" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', borderColor: 'var(--border-color)' }}>
+             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+              <h1 className="text-3xl font-extrabold tracking-tight">Team Rankings</h1>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full md:w-auto border rounded-lg px-4 py-2 outline-none" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', borderColor: 'var(--border-color)' }}>
                 <option value="ipf">IPF GL Score</option><option value="dots">DOTS Score</option><option value="ratio">Bodyweight Ratio</option>
                 <option value="squat">Max Squat</option><option value="bench">Max Bench</option><option value="deadlift">Max Deadlift</option><option value="total">Max Total</option>
               </select>
@@ -665,56 +680,73 @@ export default function App() {
 
         {/* TAB 4: CALORIE & MACRO TRACKER */}
         {activeTab === 'calories' && (
-          <div className="space-y-8">
-            <div className="flex justify-between items-center">
-              <div><h1 className="text-3xl font-extrabold tracking-tight">Nutrition Tracker</h1><p className="mt-1" style={{ color: 'var(--text-muted)' }}>Manage caloric density limits and complete macronutrient targets.</p></div>
-              <button onClick={clearCalories} className="px-4 py-2 text-xs font-bold border border-rose-500 text-rose-500 rounded-lg hover:bg-rose-500/10">Reset Day</button>
+          <div className="space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+              <div><h1 className="text-3xl font-extrabold tracking-tight">Nutrition Tracker</h1><p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>Manage caloric density limits and complete macronutrient targets.</p></div>
+              <button onClick={clearCalories} className="mt-4 md:mt-0 px-4 py-2 text-xs font-bold border border-rose-500 text-rose-500 rounded-lg hover:bg-rose-500/10">Reset Day</button>
             </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="border p-5 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <div className="border p-4 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Calorie Target Goal</span>
                 <input type="number" value={targetCalories} onChange={(e) => setTargetCalories(parseInt(e.target.value) || 0)} className="text-2xl font-black mt-2 w-full bg-transparent outline-none border-b border-dashed focus:border-blue-500" style={{ color: 'var(--text-main)' }} />
               </div>
-              <div className="border p-5 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <div className="border p-4 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Consumed</span>
                 <div className="text-2xl font-black mt-2" style={{ color: currentCalories > targetCalories ? 'var(--accent-color)' : 'var(--text-main)' }}>{currentCalories} <span className="text-xs font-normal text-slate-500">kcal</span></div>
               </div>
-              <div className="border p-5 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <div className="border p-4 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Net Remaining</span>
                 <div className="text-2xl font-black mt-2" style={{ color: targetCalories - currentCalories < 0 ? '#f43f5e' : '#10b981' }}>{targetCalories - currentCalories} <span className="text-xs font-normal text-slate-500">kcal</span></div>
               </div>
             </div>
-            <div className="border rounded-xl p-6" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-              <h2 className="text-lg font-bold mb-4">Daily Macronutrient Targets & Status</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <div className="space-y-2 border-r pr-4 last:border-0" style={{ borderColor: 'var(--border-color)' }}><div className="flex justify-between items-center"><span className="text-xs font-black uppercase text-amber-500">🍖 Protein</span><div className="text-xs text-slate-400">Target: <input type="number" className="w-12 bg-transparent border-b text-center font-bold" value={targetProtein} onChange={(e)=>setTargetProtein(parseInt(e.target.value)||0)} />g</div></div><div className="text-xl font-black">{currentProtein}g</div><div className="text-xs font-medium" style={{ color: targetProtein - currentProtein <= 0 ? '#10b981' : 'var(--text-muted)' }}>{targetProtein - currentProtein <= 0 ? '✓ Target Hit!' : `${targetProtein - currentProtein}g remaining`}</div></div>
-                <div className="space-y-2 border-r pr-4 last:border-0" style={{ borderColor: 'var(--border-color)' }}><div className="flex justify-between items-center"><span className="text-xs font-black uppercase text-blue-400">🍞 Carbohydrates</span><div className="text-xs text-slate-400">Target: <input type="number" className="w-12 bg-transparent border-b text-center font-bold" value={targetCarbs} onChange={(e)=>setTargetCarbs(parseInt(e.target.value)||0)} />g</div></div><div className="text-xl font-black">{currentCarbs}g</div><div className="text-xs font-medium" style={{ color: targetCarbs - currentCarbs <= 0 ? '#10b981' : 'var(--text-muted)' }}>{targetCarbs - currentCarbs <= 0 ? '✓ Target Hit!' : `${targetCarbs - currentCarbs}g remaining`}</div></div>
-                <div className="space-y-2"><div className="flex justify-between items-center"><span className="text-xs font-black uppercase text-rose-400">🥑 Fats</span><div className="text-xs text-slate-400">Target: <input type="number" className="w-12 bg-transparent border-b text-center font-bold" value={targetFats} onChange={(e)=>setTargetFats(parseInt(e.target.value)||0)} />g</div></div><div className="text-xl font-black">{currentFats}g</div><div className="text-xs font-medium" style={{ color: targetFats - currentFats <= 0 ? '#10b981' : 'var(--text-muted)' }}>{targetFats - currentFats <= 0 ? '✓ Target Hit!' : `${targetFats - currentFats}g remaining`}</div></div>
+            
+            <div className="border rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <h2 className="text-lg font-bold mb-3">Daily Macronutrient Targets & Status</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1 border-b md:border-b-0 md:border-r pb-4 md:pb-0 pr-0 md:pr-4" style={{ borderColor: 'var(--border-color)' }}><div className="flex justify-between items-center"><span className="text-xs font-black uppercase text-amber-500">🍖 Protein</span><div className="text-xs text-slate-400">Target: <input type="number" className="w-12 bg-transparent border-b text-center font-bold" value={targetProtein} onChange={(e)=>setTargetProtein(parseInt(e.target.value)||0)} />g</div></div><div className="text-xl font-black">{currentProtein}g</div><div className="text-xs font-medium" style={{ color: targetProtein - currentProtein <= 0 ? '#10b981' : 'var(--text-muted)' }}>{targetProtein - currentProtein <= 0 ? '✓ Hit!' : `${targetProtein - currentProtein}g rem.`}</div></div>
+                <div className="space-y-1 border-b md:border-b-0 md:border-r pb-4 md:pb-0 pr-0 md:pr-4" style={{ borderColor: 'var(--border-color)' }}><div className="flex justify-between items-center"><span className="text-xs font-black uppercase text-blue-400">🍞 Carbs</span><div className="text-xs text-slate-400">Target: <input type="number" className="w-12 bg-transparent border-b text-center font-bold" value={targetCarbs} onChange={(e)=>setTargetCarbs(parseInt(e.target.value)||0)} />g</div></div><div className="text-xl font-black">{currentCarbs}g</div><div className="text-xs font-medium" style={{ color: targetCarbs - currentCarbs <= 0 ? '#10b981' : 'var(--text-muted)' }}>{targetCarbs - currentCarbs <= 0 ? '✓ Hit!' : `${targetCarbs - currentCarbs}g rem.`}</div></div>
+                <div className="space-y-1"><div className="flex justify-between items-center"><span className="text-xs font-black uppercase text-rose-400">🥑 Fats</span><div className="text-xs text-slate-400">Target: <input type="number" className="w-12 bg-transparent border-b text-center font-bold" value={targetFats} onChange={(e)=>setTargetFats(parseInt(e.target.value)||0)} />g</div></div><div className="text-xl font-black">{currentFats}g</div><div className="text-xs font-medium" style={{ color: targetFats - currentFats <= 0 ? '#10b981' : 'var(--text-muted)' }}>{targetFats - currentFats <= 0 ? '✓ Hit!' : `${targetFats - currentFats}g rem.`}</div></div>
               </div>
             </div>
-            <div className="border rounded-xl p-6" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-              <h2 className="text-lg font-bold mb-4">Quick Add Food Logs</h2>
-              <form onSubmit={handleAddCalories} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Food Item / Meal</label><input type="text" placeholder="e.g., Chicken Breast" required value={foodName} onChange={(e) => setFoodName(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
-                  <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Calories (kcal)</label><input type="number" placeholder="650" required value={foodCalories} onChange={(e) => setFoodCalories(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Protein (g)</label><input type="number" placeholder="g" value={foodProtein} onChange={(e)=>setFoodProtein(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none text-center" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
-                  <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Carbs (g)</label><input type="number" placeholder="g" value={foodCarbs} onChange={(e)=>setFoodCarbs(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none text-center" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
-                  <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Fats (g)</label><input type="number" placeholder="g" value={foodFats} onChange={(e)=>setFoodFats(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none text-center" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
+            
+            <div className="border rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+              <h2 className="text-lg font-bold mb-3">Quick Add Food Logs</h2>
+              <form onSubmit={handleAddCalories} className="space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-7 gap-3 items-end">
+                  <div className="col-span-2 md:col-span-2">
+                    <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Food Name</label>
+                    <input type="text" placeholder="e.g. Chicken Breast" required value={foodName} onChange={(e) => setFoodName(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                  </div>
+                  <div className="col-span-2 md:col-span-2">
+                    <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Calories (kcal)</label>
+                    <input type="number" placeholder="650" required value={foodCalories} onChange={(e) => setFoodCalories(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                  </div>
+                  <div className="col-span-1 md:col-span-1">
+                    <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Pro (g)</label>
+                    <input type="number" placeholder="0" value={foodProtein} onChange={(e)=>setFoodProtein(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none text-center" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                  </div>
+                  <div className="col-span-1 md:col-span-1">
+                    <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Carbs (g)</label>
+                    <input type="number" placeholder="0" value={foodCarbs} onChange={(e)=>setFoodCarbs(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none text-center" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-xs font-bold uppercase mb-1 text-slate-400">Fats (g)</label>
+                    <input type="number" placeholder="0" value={foodFats} onChange={(e)=>setFoodFats(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none text-center" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} />
+                  </div>
                 </div>
                 <button type="submit" className="w-full font-bold py-2.5 rounded-lg border mt-2" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-text)', borderColor: 'var(--border-color)' }}>Add to Log</button>
               </form>
             </div>
+            
             <div className="border rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-              <div className="p-4 border-b font-bold" style={{ borderColor: 'var(--border-color)' }}>Meals Logged Today</div>
-              <ul className="divide-y text-sm" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="p-3 border-b font-bold" style={{ borderColor: 'var(--border-color)' }}>Meals Logged Today</div>
+              <ul className="divide-y text-sm max-h-[150px] overflow-y-auto" style={{ borderColor: 'var(--border-color)' }}>
                 {dailyFoods.length === 0 ? (
-                  <li className="p-6 text-center italic text-slate-500">No macro items tracked yet today. Feed the muscles!</li>
+                  <li className="p-4 text-center italic text-slate-500">No macro items tracked yet today. Feed the muscles!</li>
                 ) : (
                   dailyFoods.map(item => (
-                    <li key={item.id} className="p-4 flex justify-between items-center hover:bg-slate-500/5">
+                    <li key={item.id} className="p-3 flex justify-between items-center hover:bg-slate-500/5">
                       <div>
                         <div className="font-bold">{item.name}</div>
                         <div className="text-xs text-slate-400 mt-0.5">P: {item.protein}g | C: {item.carbs}g | F: {item.fats}g</div>
@@ -728,33 +760,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 5: TEAM GALLERY */}
-        {activeTab === 'gallery' && (
-          <div className="space-y-8">
-            <div><h1 className="text-3xl font-extrabold tracking-tight">Team Gallery</h1><p className="mt-1" style={{ color: 'var(--text-muted)' }}>Upload photos directly from your smartphone or laptop gallery stream.</p></div>
-            <div className="border rounded-xl p-6" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-              <h2 className="text-lg font-bold mb-4">Upload Picture From Device</h2>
-              <form onSubmit={handleAddImage} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="md:col-span-2"><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Select Image File</label><input id="gallery-file-input" type="file" accept="image/*" required onChange={handleFileChange} className="w-full border rounded-lg px-3 py-1.5 outline-none text-xs" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
-                <div><label className="block text-xs font-bold uppercase mb-1 text-slate-400">Photo Caption</label><input type="text" placeholder="Add context..." value={imageCaption} onChange={(e) => setImageCaption(e.target.value)} className="w-full border rounded-lg px-3 py-2 outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }} /></div>
-                <button type="submit" className="w-full font-bold py-2.5 rounded-lg border md:col-span-3 mt-2" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-text)', borderColor: 'var(--border-color)' }}>Publish to Grid</button>
-              </form>
-            </div>
-            {galleryImages.length === 0 ? (<div className="border border-dashed rounded-xl p-12 text-center italic" style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}>The stream is blank. Upload photos above!</div>) : (
-              <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
-                {galleryImages.map(img => (
-                  <div key={img.id} className="break-inside-avoid border rounded-xl overflow-hidden shadow-sm transition-transform relative group" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-                    <button onClick={() => handleDeleteImage(img.id)} className="absolute top-2 right-2 bg-black/70 hover:bg-rose-600 text-white font-bold text-xs px-2.5 py-1.5 rounded-md backdrop-blur transition-all opacity-90 sm:opacity-0 group-hover:opacity-100 z-10">🗑️ Delete</button>
-                    <img src={img.url} alt={img.caption} className="w-full h-auto object-cover max-h-[500px]" />
-                    <div className="p-4 text-xs font-bold tracking-wide border-t" style={{ borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>{img.caption}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 6: ROSTER MONITOR */}
+        {/* TAB 5: ROSTER MONITOR */}
         {activeTab === 'monitor' && isViceCaptain && (
           <div className="space-y-6">
             <div>
@@ -763,7 +769,7 @@ export default function App() {
             </div>
             <div className="border rounded-xl p-6 transition-colors" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
               <label className="block text-xs font-black uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Choose Athlete Roster Target</label>
-              <select value={selectedAthleteId} onChange={(e) => { setSelectedAthleteId(e.target.value); setExpandedMonitorDates({}); }} className="w-full sm:max-w-md border rounded-lg px-4 py-2.5 outline-none font-medium" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
+              <select value={selectedAthleteId} onChange={(e) => { setSelectedAthleteId(e.target.value); setExpandedMonitorDates({}); }} className="w-full md:max-w-md border rounded-lg px-4 py-2.5 outline-none font-medium" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-color)', color: 'var(--text-main)' }}>
                 <option value="">-- Select an Athlete --</option>
                 {allProfiles.map(p => (<option key={p.id} value={p.id}>{p.full_name || 'Unnamed Athlete'}</option>))}
               </select>
@@ -783,7 +789,7 @@ export default function App() {
                           {Object.keys(targetAthleteLogs[dateKey]).map((mKey) => (
                             <div key={mKey} className="border rounded-lg p-4" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-card)' }}>
                               <h4 className="font-extrabold text-sm mb-2 border-b pb-1" style={{ borderColor: 'var(--border-color)' }}>{mKey}</h4>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                                 {targetAthleteLogs[dateKey][mKey].map((setRow) => (
                                   <div key={setRow.id} className="p-2.5 rounded border flex flex-col justify-between" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-main)10' }}>
                                     <span className="font-bold uppercase tracking-wider text-[10px]" style={{ color: 'var(--text-muted)' }}>Set {setRow.sets}</span>
